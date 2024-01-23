@@ -9,15 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type strDescription string
-
-func (rcv strDescription) String() string {
-	return string(rcv)
-}
-
 func TestTreeBuilding(t *testing.T) {
 	hasher := hash.MD5Hasher{}
-	tree, err := NewTree(hasher, 4, 2, strDescription("Mors sua, vita nostra"))
+	tree, err := NewTree(hasher, 4, 2, "Mors sua, vita nostra")
 	assert.NoError(t, err)
 	assert.NotNil(t, tree)
 	assert.NoError(t, tree.Verify())
@@ -57,7 +51,7 @@ func TestCorrectnessOfProofOfWork(t *testing.T) {
 		// 5)      15 16   17 18 19*20* 21 22  23 24  25 26   27 28    29 30
 		// ------------------------------------------
 		// node 20 is selected initially
-		tree, err := NewTree(hasher, 5, 2, strDescription("Per aspera ad astra"))
+		tree, err := NewTree(hasher, 5, 2, "Per aspera ad astra")
 		assert.NoError(t, err)
 		assert.NotNil(t, tree)
 		assert.NoError(t, tree.Verify())
@@ -91,7 +85,7 @@ func TestCorrectnessOfProofOfWork(t *testing.T) {
 		// 5)      15 16  *17*18 19 20 *21*22 *23*24  25 26   *27*28    29 30
 		// ------------------------------------------
 		// nodes 18, 21, 23, 28 are selected initially
-		tree, err := NewTree(hasher, 5, 2, strDescription("No hablo espanol, senior"))
+		tree, err := NewTree(hasher, 5, 2, "No hablo espanol, senior")
 		assert.NoError(t, err)
 		assert.NotNil(t, tree)
 		assert.NoError(t, tree.Verify())
@@ -135,8 +129,8 @@ func TestCorrectnessOfProofOfWork(t *testing.T) {
 }
 
 func TestProofOfWorkVerification(t *testing.T) {
-	hasher := hash.SHA256Hahser{}
-	tree, err := NewTree(hasher, 21, 100, strDescription("Veni vidi vici"))
+	hasher := hash.MD5Hasher{}
+	tree, err := NewTree(hasher, 21, 100, "Veni vidi vici")
 	assert.NoError(t, err)
 	assert.NotNil(t, tree)
 	assert.NoError(t, tree.Verify())
@@ -172,7 +166,7 @@ func TestProofOfWorkVerification(t *testing.T) {
 func Benchmark_MD5_GenerationProofOfWork(b *testing.B) {
 	hasher := hash.MD5Hasher{}
 	for i := 0; i < b.N; i++ {
-		tree, err := NewTree(hasher, 20, 10, strDescription(fmt.Sprintf("bench_%d", i)))
+		tree, err := NewTree(hasher, 20, 10, fmt.Sprintf("bench_%d", i))
 		assert.NoError(b, err)
 		assert.NotNil(b, tree)
 
@@ -184,36 +178,7 @@ func Benchmark_MD5_GenerationProofOfWork(b *testing.B) {
 
 func Benchmark_MD5_VerifyProofOfWork(b *testing.B) {
 	hasher := hash.MD5Hasher{}
-	tree, err := NewTree(hasher, 20, 10, strDescription("bench"))
-	assert.NoError(b, err)
-	assert.NotNil(b, tree)
-
-	generatedPow, err := tree.GenerateProofOfWork()
-	assert.NoError(b, err)
-	assert.NotNil(b, generatedPow)
-
-	for i := 0; i < b.N; i++ {
-		err := generatedPow.Verify()
-		assert.NoError(b, err)
-	}
-}
-
-func Benchmark_SHA256_GenerationProofOfWork(b *testing.B) {
-	hasher := hash.SHA256Hahser{}
-	for i := 0; i < b.N; i++ {
-		tree, err := NewTree(hasher, 20, 10, strDescription(fmt.Sprintf("bench_%d", i)))
-		assert.NoError(b, err)
-		assert.NotNil(b, tree)
-
-		generatedPow, err := tree.GenerateProofOfWork()
-		assert.NoError(b, err)
-		assert.NotNil(b, generatedPow)
-	}
-}
-
-func Benchmark_SHA256_VerifyProofOfWork(b *testing.B) {
-	hasher := hash.SHA256Hahser{}
-	tree, err := NewTree(hasher, 20, 10, strDescription("bench"))
+	tree, err := NewTree(hasher, 20, 10, "bench")
 	assert.NoError(b, err)
 	assert.NotNil(b, tree)
 

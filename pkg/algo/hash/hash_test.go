@@ -19,7 +19,7 @@ func TestBase54Conversions(t *testing.T) {
 	hasher := MD5Hasher{}
 	initialHash := hasher.Hash([]byte("pish pish ololo"))
 	base64Encoded := initialHash.String()
-	decodedHash, err := FromString[Byte16](base64Encoded)
+	decodedHash, err := FromString(base64Encoded)
 	assert.NoError(t, err)
 	assert.EqualValues(t, initialHash, decodedHash)
 }

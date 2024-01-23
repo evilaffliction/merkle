@@ -71,7 +71,7 @@ func stringToNodes(data string) ([]node, error) {
 
 type accessToken struct {
 	TimeStampMicros int64
-	Value           hash.Byte16
+	Value           hash.Value
 }
 
 func (rcv accessToken) String() string {
@@ -90,7 +90,7 @@ func newAcessToken() accessToken {
 // the shorter json tags, the more space efficient merkle POW
 type headerData struct {
 	TimeStampMicros int64       `json:"t`
-	AccessToken     hash.Byte16 `json:"a"`
+	AccessToken     hash.Value `json:"a"`
 	HashFunction    string      `json:"h`
 	Depth           int         `json:"d"`
 	ProofLeavesNum  int         `json:"p"`

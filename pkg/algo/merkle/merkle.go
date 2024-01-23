@@ -11,8 +11,8 @@ import (
 )
 
 // Node is just a node with a hash function
-type Node[HashT hash.Hash] struct {
-	hashValue HashT
+type Node struct {
+	hashValue hash.Value
 }
 
 // Tree represents a merkle tree that will be stored as an ordered list of nodes.
@@ -21,14 +21,13 @@ type Node[HashT hash.Hash] struct {
 // deductable from the node number.
 // Parametrized by
 //
-//	1: HashT that may vary over hash size
-//	2: DescriptionT any description of a request that should be convertable to a string
-type Tree[HashT hash.Hash, DescriptionT fmt.Stringer] struct {
+//	1: DescriptionT any description of a request that should be convertable to a string
+type Tree struct {
 	depth          int
 	proofLeavesNum int
-	hasher         hash.Hasher[HashT]
-	description    DescriptionT
-	nodes          []Node[HashT]
+	hasher         hash.Hasher
+	description    string
+	nodes          []Node
 }
 
 // NewTree is a constructor for a Merkle tree
@@ -38,12 +37,12 @@ type Tree[HashT hash.Hash, DescriptionT fmt.Stringer] struct {
 //			2: "depth" that allows you to bring higher CPU costs for a prover
 //			3: "proofLeavesNum" that allows you to bring higher network cost
 //	     	4: "description" that varies generation of a tree. Ideally it should encorporate a timestamp
-func NewTree[HashT hash.Hash, DescriptionT fmt.Stringer](
-	hasher hash.Hasher[HashT],
+func NewTree(
+	hasher hash.Hasher,
 	depth int,
 	proofLeavesNum int,
-	description DescriptionT,
-) (*Tree[HashT, DescriptionT], error) {
+	description string,
+) (*Tree, error) {
 
 	// the trivial case is not viable and brings error handling complexity -> remove it
 	if depth <= 1 {
@@ -72,14 +71,14 @@ func NewTree[HashT hash.Hash, DescriptionT fmt.Stringer](
 	}
 
 	// actual build process starts here
-	nodes := make([]Node[HashT], nodeCount)
+	nodes := make([]Node, nodeCount)
 
 	// init build from leaves
 	b := make([]byte, 8)
 	for nodeNum := nodeCount - 1; nodeNum >= nonLeafNodeCount; nodeNum-- {
 		binary.LittleEndian.PutUint64(b, uint64(nodeNum))
 		nodeHashValue := seededHahser.Hash(b)
-		nodes[nodeNum] = Node[HashT]{
+		nodes[nodeNum] = Node{
 			hashValue: nodeHashValue,
 		}
 	}
@@ -93,11 +92,11 @@ func NewTree[HashT hash.Hash, DescriptionT fmt.Stringer](
 		leftHash := nodes[leftSonNum].hashValue
 		rightHash := nodes[rightSonNum].hashValue
 		nodeHashValue := seededHahser.Hash(hash.XORHashes(leftHash, rightHash).ToSlice())
-		nodes[nodeNum] = Node[HashT]{
+		nodes[nodeNum] = Node{
 			hashValue: nodeHashValue,
 		}
 	}
-	return &Tree[HashT, DescriptionT]{
+	return &Tree{
 		depth:          depth,
 		proofLeavesNum: proofLeavesNum,
 		hasher:         hasher,
@@ -107,7 +106,7 @@ func NewTree[HashT hash.Hash, DescriptionT fmt.Stringer](
 }
 
 // Verify allows you to check that a given Tree is correctly stored in termes of a Merkel tree
-func (rcv *Tree[HashT, DescriptionT]) Verify() error {
+func (rcv *Tree) Verify() error {
 	seededHahser := hash.NewSeededHasher(rcv.hasher, rcv.description, rcv.depth, rcv.proofLeavesNum)
 
 	nodeCount, err := getNodeCount(rcv.depth)
@@ -160,17 +159,17 @@ type NodeStats struct {
 
 // ProofOfWork stores information about a computed Merkle tree without storing the whole tree
 // Allows you to check that a prover has indeed computed the whole tree
-type ProofOfWork[HashT hash.Hash, DescriptionT fmt.Stringer] struct {
+type ProofOfWork struct {
 	NodesStats     []NodeStats
-	Hasher         hash.Hasher[HashT]
-	Description    DescriptionT
+	Hasher         hash.Hasher
+	Description    string
 	Depth          int
 	ProofLeavesNum int
 }
 
 // selectProofLeafsByHash allows you to choose from wich leaves one should
 // build a partial tree for a proof of work
-func selectProofLeavesByHash[HashT hash.Hash](hashValue HashT, depth int, numOfProofLeafes int) (map[int]struct{}, error) {
+func selectProofLeavesByHash(hashValue hash.Value, depth int, numOfProofLeafes int) (map[int]struct{}, error) {
 	hashSeed := hashValue.ToSlice()
 	if len(hashSeed) > 8 {
 		hashSeed = hashSeed[0:8]
@@ -201,9 +200,9 @@ func selectProofLeavesByHash[HashT hash.Hash](hashValue HashT, depth int, numOfP
 // generateProofOfWorkWithSelectedLeafes builds proof of work by provided
 // leafes. The building process starts from the leaves and goes up, level by level
 // of a merkle tree
-func (rcv *Tree[HashT, DescriptionT]) generateProofOfWorkWithSelectedLeafes(
+func (rcv *Tree) generateProofOfWorkWithSelectedLeafes(
 	leaves map[int]struct{},
-) (*ProofOfWork[HashT, DescriptionT], error) {
+) (*ProofOfWork, error) {
 
 	neededNodes := make([]int, 0, len(leaves)+2*rcv.depth) // euristic size assumption
 	for leaf := range leaves {
@@ -250,7 +249,7 @@ func (rcv *Tree[HashT, DescriptionT]) generateProofOfWorkWithSelectedLeafes(
 		})
 	}
 
-	return &ProofOfWork[HashT, DescriptionT]{
+	return &ProofOfWork{
 		NodesStats:     nodesStats,
 		Hasher:         rcv.hasher,
 		Description:    rcv.description,
@@ -260,7 +259,7 @@ func (rcv *Tree[HashT, DescriptionT]) generateProofOfWorkWithSelectedLeafes(
 }
 
 // GenerateProofOfWork generates a proof of work from a fully built merkle tree
-func (rcv *Tree[HashT, DescriptionT]) GenerateProofOfWork() (*ProofOfWork[HashT, DescriptionT], error) {
+func (rcv *Tree) GenerateProofOfWork() (*ProofOfWork, error) {
 	leaves, err := selectProofLeavesByHash(rcv.nodes[0].hashValue, rcv.depth, rcv.proofLeavesNum)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select leaves for verification, error: %w", err)
@@ -269,12 +268,12 @@ func (rcv *Tree[HashT, DescriptionT]) GenerateProofOfWork() (*ProofOfWork[HashT,
 
 }
 
-func computeHash[HashT hash.Hash](
-	hasher hash.Hasher[HashT],
+func computeHash(
+	hasher hash.Hasher,
 	nodeNum int,
 	depth int,
-	computedNodes map[int]Node[HashT],
-) (HashT, error) {
+	computedNodes map[int]Node,
+) (hash.Value, error) {
 
 	_, ok := computedNodes[nodeNum]
 	if ok {
@@ -283,7 +282,7 @@ func computeHash[HashT hash.Hash](
 		return res, nil
 	}
 
-	var defaultResult HashT
+	var defaultResult hash.Value
 	leftSonNum, rightSonNum, err := getChildrenNums(nodeNum, depth)
 	if err != nil {
 		return defaultResult, err
@@ -302,18 +301,18 @@ func computeHash[HashT hash.Hash](
 
 // Verify verifies that a Merkle tree was originally built and
 // a given proof of work was built from it
-func (rcv *ProofOfWork[HashT, DescriptionT]) Verify() error {
+func (rcv *ProofOfWork) Verify() error {
 	hasher := rcv.Hasher
 
 	seededHahser := hash.NewSeededHasher(hasher, rcv.Description, rcv.Depth, rcv.ProofLeavesNum)
 
-	nodes := make(map[int]Node[HashT], len(rcv.NodesStats))
+	nodes := make(map[int]Node, len(rcv.NodesStats))
 	for _, nodeStats := range rcv.NodesStats {
-		newHashVal, err := hash.FromString[HashT](nodeStats.Value)
+		newHashVal, err := hash.FromString(nodeStats.Value)
 		if err != nil {
 			return err
 		}
-		nodes[nodeStats.Num] = Node[HashT]{
+		nodes[nodeStats.Num] = Node {
 			hashValue: newHashVal,
 		}
 	}

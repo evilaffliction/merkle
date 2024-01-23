@@ -82,28 +82,13 @@ func validateMerkleHeader(
 	switch merkleData.HashFunction {
 	case "md5":
 		hasher := hash.MD5Hasher{}
-		givenPOW := &merkle.ProofOfWork[hash.Byte16, accessToken]{
+		givenPOW := &merkle.ProofOfWork{
 			NodesStats: merkleNodesStats,
 			Hasher:     hasher,
 			Description: accessToken{
 				TimeStampMicros: merkleData.TimeStampMicros,
 				Value:           merkleData.AccessToken,
-			},
-			Depth:          merkleData.Depth,
-			ProofLeavesNum: merkleData.ProofLeavesNum,
-		}
-		if err := givenPOW.Verify(); err != nil {
-			return fmt.Errorf("merkle tree verification failed")
-		}
-	case "sha256":
-		hasher := hash.SHA256Hahser{}
-		givenPOW := &merkle.ProofOfWork[hash.Byte32, accessToken]{
-			NodesStats: merkleNodesStats,
-			Hasher:     hasher,
-			Description: accessToken{
-				TimeStampMicros: merkleData.TimeStampMicros,
-				Value:           merkleData.AccessToken,
-			},
+			}.String(),
 			Depth:          merkleData.Depth,
 			ProofLeavesNum: merkleData.ProofLeavesNum,
 		}
@@ -146,23 +131,7 @@ func GenerateMerkleHeader(depth int, proofLeavesNum int, hashFunc string) (strin
 			hasher,
 			depth,
 			proofLeavesNum,
-			accessToken,
-		)
-		if err != nil {
-			return "", err
-		}
-		generatedPOW, err := tree.GenerateProofOfWork()
-		if err != nil {
-			return "", err
-		}
-		rawNodes = generatedPOW.NodesStats
-	case "sha256":
-		hasher := hash.SHA256Hahser{}
-		tree, err := merkle.NewTree(
-			hasher,
-			depth,
-			proofLeavesNum,
-			accessToken,
+			accessToken.String(),
 		)
 		if err != nil {
 			return "", err
