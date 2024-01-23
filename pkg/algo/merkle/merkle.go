@@ -312,7 +312,7 @@ func (rcv *ProofOfWork) Verify() error {
 		if err != nil {
 			return err
 		}
-		nodes[nodeStats.Num] = Node {
+		nodes[nodeStats.Num] = Node{
 			hashValue: newHashVal,
 		}
 	}

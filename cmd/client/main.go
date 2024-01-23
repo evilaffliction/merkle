@@ -34,6 +34,9 @@ func main() {
 		}
 
 		req, err := http.NewRequest("GET", quoteURL, nil)
+		if err != nil {
+			panic(fmt.Errorf("failed to create http request, error: %w", err))
+		}
 		req.Header.Set(middleware.MerkleHeaderName, merkleHeaderPayload)
 
 		resp, err := httpClient.Do(req)
@@ -48,5 +51,4 @@ func main() {
 
 		fmt.Printf("%v\n", quote)
 	}
-
 }

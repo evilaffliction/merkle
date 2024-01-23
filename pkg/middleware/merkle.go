@@ -45,7 +45,9 @@ func validateMerkleHeader(
 		return fmt.Errorf("access tokent %s was already used", merkleData.AccessToken)
 	}
 
-	accessTokenCache.Set(merkleData.AccessToken.String(), struct{}{})
+	if err := accessTokenCache.Set(merkleData.AccessToken.String(), struct{}{}); err != nil {
+		return fmt.Errorf("failed to set cache, error: %w", err)
+	}
 
 	if merkleData.Depth < 10 || merkleData.ProofLeavesNum < 3 {
 		return fmt.Errorf("prover work volume is too small")

@@ -89,10 +89,10 @@ func newAcessToken() accessToken {
 
 // the shorter json tags, the more space efficient merkle POW
 type headerData struct {
-	TimeStampMicros int64       `json:"t`
+	TimeStampMicros int64      `json:"t"`
 	AccessToken     hash.Value `json:"a"`
-	HashFunction    string      `json:"h`
-	Depth           int         `json:"d"`
-	ProofLeavesNum  int         `json:"p"`
-	NodeData        string      `json:"n"`
+	HashFunction    string     `json:"h"`
+	Depth           int        `json:"d"`
+	ProofLeavesNum  int        `json:"p"`
+	NodeData        string     `json:"n"`
 }

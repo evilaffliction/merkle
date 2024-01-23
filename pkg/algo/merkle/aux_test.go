@@ -30,15 +30,15 @@ func TestNodeCount(t *testing.T) {
 	assert.NoError(t, err)
 	assert.EqualValues(t, 0, nodeCount)
 
-	nodeCount, err = getNodeCount(-42)
+	_, err = getNodeCount(-42)
 	assert.Error(t, err)
 }
 
 func TestGetFather(t *testing.T) {
-	father, err := getFatherNum(0)
+	_, err := getFatherNum(0)
 	assert.Error(t, err)
 
-	father, err = getFatherNum(1)
+	father, err := getFatherNum(1)
 	assert.NoError(t, err)
 	assert.EqualValues(t, 0, father)
 
@@ -90,10 +90,10 @@ func TestIsLeaf(t *testing.T) {
 }
 
 func TestGetChildren(t *testing.T) {
-	left, right, err := getChildrenNums(7, 4)
+	_, _, err := getChildrenNums(7, 4)
 	assert.Error(t, err)
 
-	left, right, err = getChildrenNums(1, 4)
+	left, right, err := getChildrenNums(1, 4)
 	assert.NoError(t, err)
 	assert.EqualValues(t, 3, left)
 	assert.EqualValues(t, 4, right)
