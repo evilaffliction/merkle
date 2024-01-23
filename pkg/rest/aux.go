@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -63,7 +62,7 @@ func getContentType(contentTypeHeader []string) contentType {
 }
 
 func getData(body io.ReadCloser) ([]byte, error) {
-	data, err := ioutil.ReadAll(body)
+	data, err := io.ReadAll(body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read string response, error: %w", err)
 	}

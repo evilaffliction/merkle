@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -31,11 +30,10 @@ func main() {
 	fmt.Printf("server config: %v\n", serverConfig)
 
 	// building quote manager that will contain all the data
-	var quoteManager quote.Manager
-	quoteManager = quote.NewInMemoryManagerImpl(time.Now().Unix())
+	quoteManager := quote.NewInMemoryManagerImpl(time.Now().Unix())
 
 	// reading all files from a data folder
-	files, err := ioutil.ReadDir(serverConfig.dataFolder)
+	files, err := os.ReadDir(serverConfig.dataFolder)
 	if err != nil {
 		panic(fmt.Errorf("failed to open data folder with quotes, error: %w", err))
 	}
@@ -61,5 +59,7 @@ func main() {
 	}
 
 	r.GET(fmt.Sprintf("/v%d/quote", version), rest.EndpointWrapper(getRandomQuote))
-	r.Run(fmt.Sprintf(":%d", serverConfig.port))
+	if err := r.Run(fmt.Sprintf(":%d", serverConfig.port)); err != nil {
+		panic(fmt.Errorf("failed to run web server, error: %w", err))
+	}
 }
