@@ -1,6 +1,7 @@
 package quote
 
 import (
+	"math/rand/v2"
 	"os"
 	"testing"
 
@@ -12,7 +13,7 @@ func TestLoadingQuotes(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, data)
 
-	m := NewInMemoryManagerImpl(int64(42))
+	m := NewInMemoryManagerImpl(rand.New(rand.NewChaCha8([32]byte([]byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ123456")))))
 	assert.NotNil(t, m)
 
 	_, err = m.GetRandomQuote()
