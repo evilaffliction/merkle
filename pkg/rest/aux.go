@@ -115,7 +115,7 @@ func ReadResponse(resp *http.Response, output any) error {
 		if err != nil {
 			return fmt.Errorf("failed to read response body, error: %w", err)
 		}
-		return fmt.Errorf(string(data))
+		return fmt.Errorf("%s", string(data))
 	default:
 		return fmt.Errorf("unsupported status code reponse %d", resp.StatusCode)
 	}

@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -30,7 +30,7 @@ func main() {
 	fmt.Printf("server config: %v\n", serverConfig)
 
 	// building quote manager that will contain all the data
-	quoteManager := quote.NewInMemoryManagerImpl(time.Now().Unix())
+	quoteManager := quote.NewInMemoryManagerImpl(rand.New(rand.NewChaCha8([32]byte([]byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ123456")))))
 
 	// reading all files from a data folder
 	files, err := os.ReadDir(serverConfig.dataFolder)
