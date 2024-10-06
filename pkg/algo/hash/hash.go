@@ -38,6 +38,16 @@ func (rcv Value) String() string {
 	return base64.StdEncoding.EncodeToString(rcv[:])
 }
 
+// EqualsTo checks for equality between a given Value and provided other Value
+func (rcv Value) EqualsTo(other Value) bool {
+	for i := 0; i < len(rcv); i++ {
+		if rcv[i] != other[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // Hasher is an interface for a class that is capable of computing hash values
 // for an arbitrary byte array
 type Hasher interface {

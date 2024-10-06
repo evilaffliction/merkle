@@ -16,7 +16,8 @@ linters:
     - revive
     - unparam
     - unconvert
-
+    - tenv
+    - prealloc
 output:
   print-issued-lines: true
   print-linter-name: true
