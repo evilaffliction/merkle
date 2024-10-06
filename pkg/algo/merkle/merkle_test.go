@@ -59,7 +59,7 @@ func TestCorrectnessOfProofOfWork(t *testing.T) {
 		selectedLeafes := map[int]struct{}{
 			20: {},
 		}
-		currentPow, err := tree.generateProofOfWorkWithSelectedLeafes(selectedLeafes)
+		currentPow, err := tree.generateProofOfWorkWithSelectedLeaves(selectedLeafes)
 		assert.NoError(t, err)
 		assert.NotNil(t, currentPow)
 		assert.EqualValues(t, "Per aspera ad astra", currentPow.Description)
@@ -95,7 +95,7 @@ func TestCorrectnessOfProofOfWork(t *testing.T) {
 			23: {},
 			28: {},
 		}
-		currentPow, err := tree.generateProofOfWorkWithSelectedLeafes(selectedLeafes)
+		currentPow, err := tree.generateProofOfWorkWithSelectedLeaves(selectedLeafes)
 		assert.NoError(t, err)
 		assert.NotNil(t, currentPow)
 		assert.EqualValues(t, "No hablo espanol, senior", currentPow.Description)
