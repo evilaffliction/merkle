@@ -1,4 +1,4 @@
-package merkle
+package impl
 
 import (
 	"encoding/binary"
@@ -7,26 +7,29 @@ import (
 	"sort"
 
 	"github.com/evilaffliction/merkle/pkg/algo/hash"
+	"github.com/evilaffliction/merkle/pkg/algo/merkle"
 )
 
 // Node is just a node with a hash function
-type Node struct {
+type node struct {
 	hashValue hash.Value
 }
 
-// Tree represents a merkle tree that will be stored as an ordered list of nodes.
-// No direct connection between nodes (father->sons, son->father) is going to be stored.
-// Since Merkle tree is supposed to be a complete binary tree father's/sons' locations are
-// deductible from the node number.
-// Parametrized by
+// tree represents a merkle tree that will be stored as an ordered list of nodes.
+// every merkle tree is complete
 //
-//	1: DescriptionT any description of a request that should be convertable to a string
-type Tree struct {
+// Nodes of tree a stored in array in order to improve performance.
+// Functions in aux.go help to find father<->sons connection by their position in the "nodes" array.
+type tree struct {
 	depth          int
 	proofLeavesNum int
-	hasher         hash.Hasher
+	hashName       string
 	description    string
-	nodes          []Node
+	nodes          []node
+}
+
+func (rcv *tree) Depth() int {
+	return rcv.depth
 }
 
 // NewTree is a constructor for a Merkle tree
@@ -37,15 +40,20 @@ type Tree struct {
 //			3: "proofLeavesNum" that allows you to bring higher network cost
 //	     	4: "description" that varies generation of a tree. Ideally it should incorporate a timestamp
 func NewTree(
-	hasher hash.Hasher,
+	hashName string,
 	depth int,
 	proofLeavesNum int,
 	description string,
-) (*Tree, error) {
+) (merkle.Tree, error) {
 
 	// the trivial case is not viable and brings error handling complexity -> remove it
 	if depth <= 1 {
 		return nil, fmt.Errorf("too shallow depth %d, expected to be at least 2", depth)
+	}
+
+	hasher, err := hash.NameToHasher(hashName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create hasher for merkle tree: %w", err)
 	}
 
 	// Encoding depth and needed proofLeavesNum into description
@@ -70,14 +78,14 @@ func NewTree(
 	}
 
 	// actual build process starts here
-	nodes := make([]Node, nodeCount)
+	nodes := make([]node, nodeCount)
 
 	// init build from leaves
 	b := make([]byte, 8)
 	for nodeNum := nodeCount - 1; nodeNum >= nonLeafNodeCount; nodeNum-- {
 		binary.LittleEndian.PutUint64(b, uint64(nodeNum))
 		nodeHashValue := seededHasher.Hash(b)
-		nodes[nodeNum] = Node{
+		nodes[nodeNum] = node{
 			hashValue: nodeHashValue,
 		}
 	}
@@ -91,22 +99,23 @@ func NewTree(
 		leftHash := nodes[leftSonNum].hashValue
 		rightHash := nodes[rightSonNum].hashValue
 		nodeHashValue := seededHasher.Hash(hash.XORHashes(leftHash, rightHash).ToSlice())
-		nodes[nodeNum] = Node{
+		nodes[nodeNum] = node{
 			hashValue: nodeHashValue,
 		}
 	}
-	return &Tree{
+	return &tree{
 		depth:          depth,
 		proofLeavesNum: proofLeavesNum,
-		hasher:         hasher,
+		hashName:       hashName,
 		description:    description,
 		nodes:          nodes,
 	}, nil
 }
 
 // Verify allows you to check that a given Tree is correctly stored in terms of a Merkel tree
-func (rcv *Tree) Verify() error {
-	seededHasher := hash.NewSeededHasher(rcv.hasher, rcv.description, rcv.depth, rcv.proofLeavesNum)
+func (rcv *tree) verify() error {
+	hasher, _ := hash.NameToHasher(rcv.hashName)
+	seededHasher := hash.NewSeededHasher(hasher, rcv.description, rcv.depth, rcv.proofLeavesNum)
 
 	nodeCount, err := getNodeCount(rcv.depth)
 	if err != nil {
@@ -148,24 +157,6 @@ func (rcv *Tree) Verify() error {
 	return nil
 }
 
-// NodeStats is a structure that allows you to store information about a node (not necessary a leaf)
-// when stored in a ProofOfWork structure
-type NodeStats struct {
-	Num        int
-	Value      string
-	IsSelected bool
-}
-
-// ProofOfWork stores information about a computed Merkle tree without storing the whole tree
-// Allows you to check that a prover has indeed computed the whole tree
-type ProofOfWork struct {
-	NodesStats     []NodeStats
-	Hasher         hash.Hasher
-	Description    string
-	Depth          int
-	ProofLeavesNum int
-}
-
 // selectProofLeafsByHash allows you to choose from which leaves one should
 // build a partial tree for a proof of work
 func selectProofLeavesByHash(hashValue hash.Value, depth int, numOfProofLeaves int) (map[int]struct{}, error) {
@@ -199,9 +190,9 @@ func selectProofLeavesByHash(hashValue hash.Value, depth int, numOfProofLeaves i
 // generateProofOfWorkWithSelectedLeaves builds proof of work by provided
 // leaves. The building process starts from the leaves and goes up, level by level
 // of a merkle tree
-func (rcv *Tree) generateProofOfWorkWithSelectedLeaves(
+func (rcv *tree) generateProofOfWorkWithSelectedLeaves(
 	leaves map[int]struct{},
-) (*ProofOfWork, error) {
+) (merkle.ProofOfWork, error) {
 
 	neededNodes := make([]int, 0, len(leaves)+2*rcv.depth) // heuristic size assumption
 	for leaf := range leaves {
@@ -238,27 +229,27 @@ func (rcv *Tree) generateProofOfWorkWithSelectedLeaves(
 		return neededNodes[i] < neededNodes[j]
 	})
 
-	nodesStats := make([]NodeStats, 0, len(neededNodes))
+	nodesStats := make([]nodeStats, 0, len(neededNodes))
 	for _, nodeNum := range neededNodes {
 		_, ok := leaves[nodeNum]
-		nodesStats = append(nodesStats, NodeStats{
+		nodesStats = append(nodesStats, nodeStats{
 			Num:        nodeNum,
 			Value:      rcv.nodes[nodeNum].hashValue.String(),
 			IsSelected: ok,
 		})
 	}
 
-	return &ProofOfWork{
-		NodesStats:     nodesStats,
-		Hasher:         rcv.hasher,
-		Description:    rcv.description,
-		Depth:          rcv.depth,
-		ProofLeavesNum: rcv.proofLeavesNum,
+	return &proofOfWork{
+		NodesStats:        nodesStats,
+		HashName:          rcv.hashName,
+		Description:       rcv.description,
+		DepthVal:          rcv.depth,
+		ProofLeavesNumVal: rcv.proofLeavesNum,
 	}, nil
 }
 
 // GenerateProofOfWork generates a proof of work from a fully built merkle tree
-func (rcv *Tree) GenerateProofOfWork() (*ProofOfWork, error) {
+func (rcv *tree) GenerateProofOfWork() (merkle.ProofOfWork, error) {
 	leaves, err := selectProofLeavesByHash(rcv.nodes[0].hashValue, rcv.depth, rcv.proofLeavesNum)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select leaves for verification, error: %w", err)
@@ -270,7 +261,7 @@ func computeHash(
 	hasher hash.Hasher,
 	nodeNum int,
 	depth int,
-	computedNodes map[int]Node,
+	computedNodes map[int]node,
 ) (hash.Value, error) {
 
 	_, ok := computedNodes[nodeNum]
@@ -295,54 +286,4 @@ func computeHash(
 	}
 
 	return hasher.Hash(hash.XORHashes(leftHash, rightHash).ToSlice()), nil
-}
-
-// Verify verifies that a Merkle tree was originally built and
-// a given proof of work was built from it
-func (rcv *ProofOfWork) Verify() error {
-	hasher := rcv.Hasher
-
-	seededHahser := hash.NewSeededHasher(hasher, rcv.Description, rcv.Depth, rcv.ProofLeavesNum)
-
-	nodes := make(map[int]Node, len(rcv.NodesStats))
-	for _, nodeStats := range rcv.NodesStats {
-		newHashVal, err := hash.FromString(nodeStats.Value)
-		if err != nil {
-			return err
-		}
-		nodes[nodeStats.Num] = Node{
-			hashValue: newHashVal,
-		}
-	}
-	rootHash, err := computeHash(seededHahser, 0, rcv.Depth, nodes)
-	if err != nil {
-		return fmt.Errorf("failed to compute root hash, error: %w", err)
-	}
-
-	if len(nodes) != 0 {
-		return fmt.Errorf("malfmed proof of work, not all nodes were used to compute root hash")
-	}
-
-	expectedSelectedLeafNodes, err := selectProofLeavesByHash(rootHash, rcv.Depth, rcv.ProofLeavesNum)
-	if err != nil {
-		return fmt.Errorf("failed to select proof leaves, error: %w", err)
-	}
-	actualSelectedLeafNodes := make(map[int]struct{})
-	for _, nodeStats := range rcv.NodesStats {
-		if nodeStats.IsSelected {
-			actualSelectedLeafNodes[nodeStats.Num] = struct{}{}
-		}
-	}
-	if len(expectedSelectedLeafNodes) != len(actualSelectedLeafNodes) {
-		return fmt.Errorf("expected number %d and acutal number %d of selected leafs are different",
-			len(expectedSelectedLeafNodes), len(actualSelectedLeafNodes))
-	}
-	for expectedNodePos := range expectedSelectedLeafNodes {
-		_, ok := actualSelectedLeafNodes[expectedNodePos]
-		if !ok {
-			return fmt.Errorf("node %d is expected to be selected, but it is not", expectedNodePos)
-		}
-	}
-
-	return nil
 }
