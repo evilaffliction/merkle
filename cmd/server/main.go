@@ -52,7 +52,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.GetMerkleMiddlware())
+	r.Use(middleware.GetMerkleMiddleware())
 
 	getRandomQuote := func(_ *gin.Context) (any, error) {
 		return quoteManager.GetRandomQuote()

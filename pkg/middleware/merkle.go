@@ -2,13 +2,13 @@ package middleware
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/evilaffliction/merkle/pkg/algo/merkle/impl"
 	"github.com/gin-gonic/gin"
 
-	"github.com/evilaffliction/merkle/pkg/algo/hash"
-	"github.com/evilaffliction/merkle/pkg/algo/merkle"
 	"github.com/evilaffliction/merkle/pkg/rest"
 
 	"github.com/bluele/gcache"
@@ -22,7 +22,6 @@ func validateMerkleHeader(
 	accessTokenCache gcache.Cache,
 	cfg config,
 ) error {
-
 	if len(header) == 0 {
 		return fmt.Errorf("no merkle auth header")
 	}
@@ -31,83 +30,60 @@ func validateMerkleHeader(
 		return fmt.Errorf("unexpected merkle header struct")
 	}
 
-	var merkleData headerData
-	if err := json.Unmarshal([]byte(header[0]), &merkleData); err != nil {
-		return fmt.Errorf("unexpected merkle header struct")
+	pow, err := impl.RestoreProofOfWorkFromJSON([]byte(header[0]))
+	if err != nil {
+		return fmt.Errorf("unexpected merkle header struct: %w", err)
 	}
-	_, err := accessTokenCache.Get(merkleData.AccessToken.String())
+
+	accessTokenStr := pow.AccessToken()
+	_, err = accessTokenCache.Get(accessTokenStr)
 	switch {
-	case err == gcache.KeyNotFoundError:
+	case errors.Is(err, gcache.KeyNotFoundError):
 		// all is good, access token is fresh
 	case err != nil:
 		return fmt.Errorf("failed to verify request in cache history, error: %w", err)
 	default:
-		return fmt.Errorf("access tokent %s was already used", merkleData.AccessToken)
+		return fmt.Errorf("access tokent %s was already used", accessTokenStr)
 	}
 
-	if err := accessTokenCache.Set(merkleData.AccessToken.String(), struct{}{}); err != nil {
+	if err := accessTokenCache.Set(accessTokenStr, struct{}{}); err != nil {
 		return fmt.Errorf("failed to set cache, error: %w", err)
 	}
 
-	if merkleData.Depth < 10 || merkleData.ProofLeavesNum < 3 {
+	if pow.Depth() < 10 || pow.ProofLeavesNum() < 3 {
 		return fmt.Errorf("prover work volume is too small")
 	}
 
-	if merkleData.Depth > 25 || merkleData.ProofLeavesNum > 10 {
+	if pow.Depth() > 25 || pow.ProofLeavesNum() > 10 {
 		return fmt.Errorf("verifier is expected to have large amount of work")
 	}
 
+	accessToken, err := restoreAccessToken(accessTokenStr)
+	if err != nil {
+		return fmt.Errorf("failed to parse access token: %w", err)
+	}
+
 	now := time.Now().UnixMicro()
-	if now < merkleData.TimeStampMicros {
+	if now < accessToken.TimeStampMicros {
 		return fmt.Errorf("prover time stamp is in future")
 	}
 
 	// 5 seconds
-	if now-merkleData.TimeStampMicros > cfg.accessTokenLifeTime.Microseconds() {
+	if now-accessToken.TimeStampMicros > cfg.accessTokenLifeTime.Microseconds() {
 		return fmt.Errorf("prover time stamp is dated")
 	}
 
-	nodesData, err := stringToNodes(merkleData.NodeData)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal node data")
-	}
-
-	merkleNodesStats := make([]merkle.NodeStats, 0, len(nodesData))
-	for _, nodeStats := range nodesData {
-		merkleNodesStats = append(merkleNodesStats, merkle.NodeStats{
-			Num:        nodeStats.Num,
-			Value:      nodeStats.Value,
-			IsSelected: nodeStats.IsSelected,
-		})
-	}
-
-	switch merkleData.HashFunction {
-	case "md5":
-		hasher := hash.MD5Hasher{}
-		givenPOW := &merkle.ProofOfWork{
-			NodesStats: merkleNodesStats,
-			Hasher:     hasher,
-			Description: accessToken{
-				TimeStampMicros: merkleData.TimeStampMicros,
-				Value:           merkleData.AccessToken,
-			}.String(),
-			Depth:          merkleData.Depth,
-			ProofLeavesNum: merkleData.ProofLeavesNum,
-		}
-		if err := givenPOW.Verify(); err != nil {
-			return fmt.Errorf("merkle tree verification failed")
-		}
-	default:
-		return fmt.Errorf("unsupported hash function")
+	if err := pow.Verify(); err != nil {
+		return fmt.Errorf("failed to verify pow: %w", err)
 	}
 
 	return nil
 }
 
-// GetMerkleMiddlware returns a fully ready gin-gonic middleware for a POW
+// GetMerkleMiddleware returns a fully ready gin-gonic middleware for a POW
 // functionality based on merkle trees.
 // One should use GenerateMerkleHeader to build a correct header for this middleware
-func GetMerkleMiddlware(opts ...Option) gin.HandlerFunc {
+func GetMerkleMiddleware(opts ...Option) gin.HandlerFunc {
 	cfg := newConfigFromOptions(opts...)
 	accessTokenCache := gcache.New(cfg.accessTokenCacheSize).Expiration(time.Minute).Build()
 	return func(ctx *gin.Context) {
@@ -124,55 +100,26 @@ func GetMerkleMiddlware(opts ...Option) gin.HandlerFunc {
 // GenerateMerkleHeader generates compact, serialized PoW based on Merkle trees.
 // Header from this function is supposed to be served by a middleware from GetMerkleMiddlware
 func GenerateMerkleHeader(depth int, proofLeavesNum int, hashFunc string) (string, error) {
-	accessToken := newAcessToken()
-	var rawNodes []merkle.NodeStats
-	switch hashFunc {
-	case "md5":
-		hasher := hash.MD5Hasher{}
-		tree, err := merkle.NewTree(
-			hasher,
-			depth,
-			proofLeavesNum,
-			accessToken.String(),
-		)
-		if err != nil {
-			return "", err
-		}
-		generatedPOW, err := tree.GenerateProofOfWork()
-		if err != nil {
-			return "", err
-		}
-		rawNodes = generatedPOW.NodesStats
-	default:
-		return "", fmt.Errorf("unknown hash function %q", hashFunc)
-	}
-
-	convertedNodes := make([]node, 0, len(rawNodes))
-	for _, rawNode := range rawNodes {
-		convertedNodes = append(convertedNodes, node{
-			Num:        rawNode.Num,
-			Value:      rawNode.Value,
-			IsSelected: rawNode.IsSelected,
-		})
-	}
-
-	nodeData, err := nodesToString(convertedNodes)
+	accessToken := newAccessToken()
+	tree, err := impl.NewTree(
+		hashFunc,
+		depth,
+		proofLeavesNum,
+		accessToken.String(),
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal nodes, error: %w", err)
+		return "", fmt.Errorf("failed to create new merkle tree: %w", err)
 	}
 
-	merkleData := headerData{
-		TimeStampMicros: accessToken.TimeStampMicros,
-		AccessToken:     accessToken.Value,
-		HashFunction:    hashFunc,
-		Depth:           depth,
-		ProofLeavesNum:  proofLeavesNum,
-		NodeData:        nodeData,
+	pow, err := tree.GenerateProofOfWork()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate proof of work: %w", err)
 	}
 
-	jsonData, err := json.Marshal(&merkleData)
+	jsonData, err := json.Marshal(pow)
 	if err != nil {
 		return "", fmt.Errorf("failed to json marshal merkle header, error: %w", err)
 	}
+
 	return string(jsonData), nil
 }

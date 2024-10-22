@@ -103,3 +103,13 @@ func XORHashes(left, right Value) Value {
 	}
 	return output
 }
+
+func NameToHasher(hashName string) (Hasher, error) {
+	switch hashName {
+	case "md5":
+		return MD5Hasher{}, nil
+	default:
+		return nil, fmt.Errorf("unknown hash %q", hashName)
+	}
+	// unreachable
+}
