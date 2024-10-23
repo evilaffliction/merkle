@@ -14,92 +14,72 @@ import (
 // ------------------------------------------
 
 func TestNodeCount(t *testing.T) {
-	nodeCount, err := getNodeCount(1)
-	assert.NoError(t, err)
+	nodeCount := getNodeCount(1)
 	assert.EqualValues(t, 1, nodeCount)
 
-	nodeCount, err = getNodeCount(4)
-	assert.NoError(t, err)
+	nodeCount = getNodeCount(4)
 	assert.EqualValues(t, 15, nodeCount)
 
-	nodeCount, err = getNodeCount(10)
-	assert.NoError(t, err)
+	nodeCount = getNodeCount(10)
 	assert.EqualValues(t, 1023, nodeCount)
 
-	nodeCount, err = getNodeCount(0)
-	assert.NoError(t, err)
+	nodeCount = getNodeCount(0)
 	assert.EqualValues(t, 0, nodeCount)
 
-	_, err = getNodeCount(-42)
-	assert.Error(t, err)
+	assert.Panics(t, func() { getNodeCount(-42) })
 }
 
 func TestGetFather(t *testing.T) {
-	_, err := getFatherNum(0)
-	assert.Error(t, err)
+	assert.Panics(t, func() { getFatherNum(0) })
 
-	father, err := getFatherNum(1)
-	assert.NoError(t, err)
+	father := getFatherNum(1)
 	assert.EqualValues(t, 0, father)
 
-	father, err = getFatherNum(2)
-	assert.NoError(t, err)
+	father = getFatherNum(2)
 	assert.EqualValues(t, 0, father)
 
-	father, err = getFatherNum(10)
-	assert.NoError(t, err)
+	father = getFatherNum(10)
 	assert.EqualValues(t, 4, father)
 
-	father, err = getFatherNum(11)
-	assert.NoError(t, err)
+	father = getFatherNum(11)
 	assert.EqualValues(t, 5, father)
 
-	father, err = getFatherNum(12)
-	assert.NoError(t, err)
+	father = getFatherNum(12)
 	assert.EqualValues(t, 5, father)
 
-	father, err = getFatherNum(13)
-	assert.NoError(t, err)
+	father = getFatherNum(13)
 	assert.EqualValues(t, 6, father)
 
-	father, err = getFatherNum(98713)
-	assert.NoError(t, err)
+	father = getFatherNum(98713)
 	assert.EqualValues(t, 49356, father)
 }
 
 func TestIsLeaf(t *testing.T) {
-	isLeafRes, err := isLeaf(0, 1)
-	assert.NoError(t, err)
+	isLeafRes := isLeaf(0, 1)
 	assert.True(t, isLeafRes)
 
 	for i := 0; i <= 6; i++ {
-		isLeafRes, err = isLeaf(i, 4)
-		assert.NoError(t, err)
+		isLeafRes = isLeaf(i, 4)
 		assert.False(t, isLeafRes)
 	}
 	for i := 7; i <= 14; i++ {
-		isLeafRes, err = isLeaf(i, 4)
-		assert.NoError(t, err)
+		isLeafRes = isLeaf(i, 4)
 		assert.True(t, isLeafRes)
 	}
 
 	for i := 15; i < 42; i++ {
-		_, err = isLeaf(i, 4)
-		assert.Error(t, err)
+		assert.Panics(t, func() { isLeaf(i, 4) })
 	}
 }
 
 func TestGetChildren(t *testing.T) {
-	_, _, err := getChildrenNums(7, 4)
-	assert.Error(t, err)
+	assert.Panics(t, func() { getChildrenNums(7, 4) })
 
-	left, right, err := getChildrenNums(1, 4)
-	assert.NoError(t, err)
+	left, right := getChildrenNums(1, 4)
 	assert.EqualValues(t, 3, left)
 	assert.EqualValues(t, 4, right)
 
-	left, right, err = getChildrenNums(6, 4)
-	assert.NoError(t, err)
+	left, right = getChildrenNums(6, 4)
 	assert.EqualValues(t, 13, left)
 	assert.EqualValues(t, 14, right)
 }

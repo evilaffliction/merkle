@@ -8,6 +8,6 @@ type ProofOfWork interface {
 }
 
 type Tree interface {
-	GenerateProofOfWork() (ProofOfWork, error)
+	GenerateProofOfWork() ProofOfWork
 	Depth() int
 }

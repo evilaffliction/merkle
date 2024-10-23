@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/evilaffliction/merkle/pkg/algo/merkle/impl"
 	"github.com/gin-gonic/gin"
 
+	"github.com/evilaffliction/merkle/pkg/algo/merkle/impl"
 	"github.com/evilaffliction/merkle/pkg/rest"
 
 	"github.com/bluele/gcache"
@@ -111,11 +111,7 @@ func GenerateMerkleHeader(depth int, proofLeavesNum int, hashFunc string) (strin
 		return "", fmt.Errorf("failed to create new merkle tree: %w", err)
 	}
 
-	pow, err := tree.GenerateProofOfWork()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate proof of work: %w", err)
-	}
-
+	pow := tree.GenerateProofOfWork()
 	jsonData, err := json.Marshal(pow)
 	if err != nil {
 		return "", fmt.Errorf("failed to json marshal merkle header, error: %w", err)

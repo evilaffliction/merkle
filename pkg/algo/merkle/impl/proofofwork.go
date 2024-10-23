@@ -47,19 +47,13 @@ func (rcv *proofOfWork) Verify() error {
 			hashValue: newHashVal,
 		}
 	}
-	rootHash, err := computeHash(seededHasher, 0, rcv.DepthVal, nodes)
-	if err != nil {
-		return fmt.Errorf("failed to compute root hash, error: %w", err)
-	}
+	rootHash := computeHash(seededHasher, 0, rcv.DepthVal, nodes)
 
 	if len(nodes) != 0 {
 		return fmt.Errorf("malfmed proof of work, not all nodes were used to compute root hash")
 	}
 
-	expectedSelectedLeafNodes, err := selectProofLeavesByHash(rootHash, rcv.DepthVal, rcv.ProofLeavesNumVal)
-	if err != nil {
-		return fmt.Errorf("failed to select proof leaves, error: %w", err)
-	}
+	expectedSelectedLeafNodes := selectProofLeavesByHash(rootHash, rcv.DepthVal, rcv.ProofLeavesNumVal)
 	actualSelectedLeafNodes := make(map[int]struct{})
 	for _, nodeStats := range rcv.NodesStats {
 		if nodeStats.IsSelected {

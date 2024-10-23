@@ -27,23 +27,19 @@ func TestPlainTree(t *testing.T) {
 func TestStabilityOfProofLeafesGeneration(t *testing.T) {
 	hasher := hash.MD5Hasher{}
 	someHash := hasher.Hash([]byte("To be, or not to be, that is the question:"))
-	nodeNumsOriginal, err := selectProofLeavesByHash(someHash, 10, 15)
-	assert.NoError(t, err)
+	nodeNumsOriginal := selectProofLeavesByHash(someHash, 10, 15)
 	assert.Len(t, nodeNumsOriginal, 15)
 	for nodeNum := range nodeNumsOriginal {
-		isLeafNode, err := isLeaf(nodeNum, 10)
-		assert.NoError(t, err)
+		isLeafNode := isLeaf(nodeNum, 10)
 		assert.True(t, isLeafNode)
 	}
 	for i := 0; i < 10; i++ {
-		nodeNums, err := selectProofLeavesByHash(someHash, 10, 15)
-		assert.NoError(t, err)
+		nodeNums := selectProofLeavesByHash(someHash, 10, 15)
 		assert.EqualValues(t, nodeNumsOriginal, nodeNums)
 	}
 
 	otherHash := hasher.Hash([]byte("Whether 'tis nobler in the mind to suffer"))
-	otherNodeNums, err := selectProofLeavesByHash(otherHash, 10, 15)
-	assert.NoError(t, err)
+	otherNodeNums := selectProofLeavesByHash(otherHash, 10, 15)
 	assert.NotEqualValues(t, nodeNumsOriginal, otherNodeNums)
 }
 
@@ -63,8 +59,7 @@ func TestCorrectnessOfProofOfWork(t *testing.T) {
 		selectedLeafes := map[int]struct{}{
 			20: {},
 		}
-		currentPow, err := rawTree.generateProofOfWorkWithSelectedLeaves(selectedLeafes)
-		assert.NoError(t, err)
+		currentPow := rawTree.generateProofOfWorkWithSelectedLeaves(selectedLeafes)
 		assert.NotNil(t, currentPow)
 		rawPow := currentPow.(*proofOfWork)
 		assert.EqualValues(t, "Per aspera ad astra", rawPow.Description)
@@ -98,8 +93,7 @@ func TestCorrectnessOfProofOfWork(t *testing.T) {
 			23: {},
 			28: {},
 		}
-		currentPow, err := rawTree.generateProofOfWorkWithSelectedLeaves(selectedLeaves)
-		assert.NoError(t, err)
+		currentPow := rawTree.generateProofOfWorkWithSelectedLeaves(selectedLeaves)
 		assert.NotNil(t, currentPow)
 		rawPow := currentPow.(*proofOfWork)
 		assert.EqualValues(t, "No hablo espanol, senior", rawPow.Description)
@@ -136,16 +130,15 @@ func TestProofOfWorkVerification(t *testing.T) {
 	rawTree := getTree(t, 21, 100, "Veni vidi vici")
 
 	t.Run("Generated_POW_should_be_good", func(t *testing.T) {
-		generatedPow, err := rawTree.GenerateProofOfWork()
-		assert.NoError(t, err)
+		generatedPow := rawTree.GenerateProofOfWork()
 		assert.NotNil(t, generatedPow)
 
-		err = generatedPow.Verify()
+		err := generatedPow.Verify()
 		assert.NoError(t, err)
 	})
 
 	t.Run("Changing_description_should_break_verification", func(t *testing.T) {
-		generatedPow, _ := rawTree.GenerateProofOfWork()
+		generatedPow := rawTree.GenerateProofOfWork()
 		rawPow := generatedPow.(*proofOfWork)
 		rawPow.Description = "no no no"
 		err := rawPow.Verify()
@@ -153,7 +146,7 @@ func TestProofOfWorkVerification(t *testing.T) {
 	})
 
 	t.Run("Extra_nodes_should_break_verification", func(t *testing.T) {
-		generatedPow, _ := rawTree.GenerateProofOfWork()
+		generatedPow := rawTree.GenerateProofOfWork()
 		rawPow := generatedPow.(*proofOfWork)
 		rawPow.NodesStats = append(rawPow.NodesStats, nodeStats{
 			Num:        666,
@@ -171,8 +164,7 @@ func Benchmark_MD5_GenerationProofOfWork(b *testing.B) {
 		assert.NoError(b, err)
 		assert.NotNil(b, t)
 
-		pow, err := t.GenerateProofOfWork()
-		assert.NoError(b, err)
+		pow := t.GenerateProofOfWork()
 		assert.NotNil(b, pow)
 	}
 }
@@ -182,8 +174,7 @@ func Benchmark_MD5_VerifyProofOfWork(b *testing.B) {
 	assert.NoError(b, err)
 	assert.NotNil(b, t)
 
-	pow, err := t.GenerateProofOfWork()
-	assert.NoError(b, err)
+	pow := t.GenerateProofOfWork()
 	assert.NotNil(b, pow)
 
 	for i := 0; i < b.N; i++ {
