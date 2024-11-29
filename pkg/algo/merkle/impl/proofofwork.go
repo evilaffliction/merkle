@@ -93,3 +93,24 @@ func RestoreProofOfWorkFromJSON(jsonData []byte) (merkle.ProofOfWork, error) {
 	}
 	return &res, nil
 }
+
+func computeHash(
+	hasher hash.Hasher,
+	nodeNum int,
+	depth int,
+	computedNodes map[int]node,
+) hash.Value {
+
+	_, ok := computedNodes[nodeNum]
+	if ok {
+		res := computedNodes[nodeNum].hashValue
+		delete(computedNodes, nodeNum) // all nodes should be used exactly 1 time
+		return res
+	}
+
+	leftSonNum, rightSonNum := getChildrenNums(nodeNum, depth)
+	leftHash := computeHash(hasher, leftSonNum, depth, computedNodes)
+	rightHash := computeHash(hasher, rightSonNum, depth, computedNodes)
+
+	return hasher.Hash(hash.XORHashes(leftHash, rightHash).ToSlice())
+}

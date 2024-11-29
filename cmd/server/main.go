@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joomcode/errorx"
 
 	"github.com/evilaffliction/merkle/pkg/middleware"
 	"github.com/evilaffliction/merkle/pkg/quote"
@@ -59,7 +60,19 @@ func main() {
 	}
 
 	r.GET(fmt.Sprintf("/v%d/quote", version), rest.EndpointWrapper(getRandomQuote))
-	if err := r.Run(fmt.Sprintf(":%d", serverConfig.port)); err != nil {
-		panic(fmt.Errorf("failed to run web server, error: %w", err))
+
+	key, cert, err := rest.GenerateKeyCert()
+	if err != nil {
+		panic(errorx.Panic(errorx.InternalError.Wrap(err, "failed to generate key/cert pem files")))
+	}
+	if err := os.WriteFile("key.pem", key, 0755); err != nil {
+		panic(errorx.Panic(errorx.InternalError.Wrap(err, "failed to write pem key to key.pem file")))
+	}
+	if err := os.WriteFile("cert.pem", cert, 0755); err != nil {
+		panic(errorx.Panic(errorx.InternalError.Wrap(err, "failed to write pem cert to cert.pem file")))
+	}
+
+	if err := r.RunTLS(fmt.Sprintf(":%d", serverConfig.port), "cert.pem", "key.pem"); err != nil {
+		panic(errorx.Panic(errorx.InternalError.Wrap(err, "failed to run web server")))
 	}
 }

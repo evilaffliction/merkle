@@ -2,7 +2,6 @@ package impl
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math/rand"
 	"sort"
 
@@ -37,7 +36,7 @@ func (rcv *tree) Depth() int {
 // NewTree is a constructor for a Merkle tree
 // It requires
 //
-//			1: "hasher" to bring crypto security
+//			1: "hashName" to bring crypto security
 //			2: "depth" that allows you to bring higher CPU costs for a prover
 //			3: "proofLeavesNum" that allows you to bring higher network cost
 //	     	4: "description" that varies generation of a tree. Ideally it should incorporate a timestamp
@@ -80,9 +79,8 @@ func NewTree(
 	b := make([]byte, 8)
 	for nodeNum := nodeCount - 1; nodeNum >= nonLeafNodeCount; nodeNum-- {
 		binary.LittleEndian.PutUint64(b, uint64(nodeNum))
-		nodeHashValue := seededHasher.Hash(b)
 		nodes[nodeNum] = node{
-			hashValue: nodeHashValue,
+			hashValue: seededHasher.Hash(b),
 		}
 	}
 	// build the rest of the tree, starting from the lowest (with greater depth) nodes
@@ -90,9 +88,8 @@ func NewTree(
 		leftSonNum, rightSonNum := getChildrenNums(nodeNum, depth)
 		leftHash := nodes[leftSonNum].hashValue
 		rightHash := nodes[rightSonNum].hashValue
-		nodeHashValue := seededHasher.Hash(hash.XORHashes(leftHash, rightHash).ToSlice())
 		nodes[nodeNum] = node{
-			hashValue: nodeHashValue,
+			hashValue: seededHasher.Hash(hash.XORHashes(leftHash, rightHash).ToSlice()),
 		}
 	}
 	return &tree{
@@ -114,7 +111,7 @@ func (rcv *tree) verify() error {
 
 	// check that we have indeed expected number of nodes
 	if nodeCount != len(rcv.nodes) {
-		return fmt.Errorf("merkle tree with depth %d ecxpted to have %d nodes, actual count: %d",
+		return errorx.InternalError.New("merkle tree with depth %d expected to have %d nodes, actual count: %d",
 			rcv.depth, nodeCount, len(rcv.nodes))
 	}
 
@@ -123,7 +120,7 @@ func (rcv *tree) verify() error {
 	for nodeNum := nodeCount - 1; nodeNum >= nonLeafNodeCount; nodeNum-- {
 		binary.LittleEndian.PutUint64(b, uint64(nodeNum))
 		if !rcv.nodes[nodeNum].hashValue.EqualsTo(seededHasher.Hash(b)) {
-			return fmt.Errorf("leaf node %d has incorrect hash value", nodeNum)
+			return errorx.InternalError.New("leaf node %d has incorrect hash value", nodeNum)
 		}
 	}
 
@@ -133,7 +130,7 @@ func (rcv *tree) verify() error {
 		tmpBuf := hash.XORHashes(rcv.nodes[leftSonNum].hashValue, rcv.nodes[rightSonNum].hashValue)
 		expectedHash := seededHasher.Hash(tmpBuf.ToSlice())
 		if !rcv.nodes[nodeNum].hashValue.EqualsTo(expectedHash) {
-			return fmt.Errorf("non-leaf node %d has incorrect hash value", nodeNum)
+			return errorx.InternalError.New("non-leaf node %d has incorrect hash value", nodeNum)
 		}
 	}
 
@@ -176,6 +173,7 @@ func (rcv *tree) generateProofOfWorkWithSelectedLeaves(
 		neededNodes = append(neededNodes, leaf)
 	}
 
+	// TODO: think about re-usage of sets
 	curLevelNodes := leaves
 	for i := 0; i < rcv.depth-1; i++ {
 		fatherNodes := make(map[int]struct{}, len(curLevelNodes)/2)
@@ -223,25 +221,4 @@ func (rcv *tree) generateProofOfWorkWithSelectedLeaves(
 func (rcv *tree) GenerateProofOfWork() merkle.ProofOfWork {
 	leaves := selectProofLeavesByHash(rcv.nodes[0].hashValue, rcv.depth, rcv.proofLeavesNum)
 	return rcv.generateProofOfWorkWithSelectedLeaves(leaves)
-}
-
-func computeHash(
-	hasher hash.Hasher,
-	nodeNum int,
-	depth int,
-	computedNodes map[int]node,
-) hash.Value {
-
-	_, ok := computedNodes[nodeNum]
-	if ok {
-		res := computedNodes[nodeNum].hashValue
-		delete(computedNodes, nodeNum) // all nodes should be used exactly 1 time
-		return res
-	}
-
-	leftSonNum, rightSonNum := getChildrenNums(nodeNum, depth)
-	leftHash := computeHash(hasher, leftSonNum, depth, computedNodes)
-	rightHash := computeHash(hasher, rightSonNum, depth, computedNodes)
-
-	return hasher.Hash(hash.XORHashes(leftHash, rightHash).ToSlice())
 }

@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	httpClient := &http.Client{}
-	quoteURL := fmt.Sprintf("http://%s:%d/v%d/quote", clientConfig.host, clientConfig.port, version)
+	quoteURL := fmt.Sprintf("https://%s:%d/v%d/quote", clientConfig.host, clientConfig.port, version)
 
 	for i := 0; i < clientConfig.quotesNum; i++ {
 		merkleHeaderPayload, err := middleware.GenerateMerkleHeader(20, 5, "md5")

@@ -24,7 +24,7 @@ func TestPlainTree(t *testing.T) {
 	require.NotNil(t, v)
 }
 
-func TestStabilityOfProofLeafesGeneration(t *testing.T) {
+func TestStabilityOfProofLeavesGeneration(t *testing.T) {
 	hasher := hash.MD5Hasher{}
 	someHash := hasher.Hash([]byte("To be, or not to be, that is the question:"))
 	nodeNumsOriginal := selectProofLeavesByHash(someHash, 10, 15)

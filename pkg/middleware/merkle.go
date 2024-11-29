@@ -3,7 +3,6 @@ package middleware
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,16 +22,16 @@ func validateMerkleHeader(
 	cfg config,
 ) error {
 	if len(header) == 0 {
-		return fmt.Errorf("no merkle auth header")
+		return InvalidInputError.New("no merkle auth header")
 	}
 
 	if len(header) > 1 {
-		return fmt.Errorf("unexpected merkle header struct")
+		return InvalidInputError.New("unexpected merkle header struct, found several headers, expected only 1")
 	}
 
 	pow, err := impl.RestoreProofOfWorkFromJSON([]byte(header[0]))
 	if err != nil {
-		return fmt.Errorf("unexpected merkle header struct: %w", err)
+		return InvalidInputError.Wrap(err, "unexpected merkle header struct")
 	}
 
 	accessTokenStr := pow.AccessToken()
@@ -41,40 +40,40 @@ func validateMerkleHeader(
 	case errors.Is(err, gcache.KeyNotFoundError):
 		// all is good, access token is fresh
 	case err != nil:
-		return fmt.Errorf("failed to verify request in cache history, error: %w", err)
+		return InternalError.Wrap(err, "failed to verify request in cache history")
 	default:
-		return fmt.Errorf("access tokent %s was already used", accessTokenStr)
+		return IncorrectMerkleError.New("access tokent %q was already used", accessTokenStr)
 	}
 
 	if err := accessTokenCache.Set(accessTokenStr, struct{}{}); err != nil {
-		return fmt.Errorf("failed to set cache, error: %w", err)
+		return InternalError.Wrap(err, "failed to set cache")
 	}
 
-	if pow.Depth() < 10 || pow.ProofLeavesNum() < 3 {
-		return fmt.Errorf("prover work volume is too small")
+	if pow.Depth() < cfg.minAllowedDepth || pow.ProofLeavesNum() < cfg.minAllowedProofLeavesNum {
+		return InsufficientComplexityError.New("prover work volume is too small")
 	}
 
-	if pow.Depth() > 25 || pow.ProofLeavesNum() > 10 {
-		return fmt.Errorf("verifier is expected to have large amount of work")
+	if pow.Depth() > cfg.maxAllowedDepth || pow.ProofLeavesNum() > cfg.maxAllowedProofLeavesNum {
+		return OverwhelmingComplexityError.New("verifier is expected to have large amount of work")
 	}
 
 	accessToken, err := restoreAccessToken(accessTokenStr)
 	if err != nil {
-		return fmt.Errorf("failed to parse access token: %w", err)
+		return IncorrectMerkleError.Wrap(err, "failed to parse access token")
 	}
 
 	now := time.Now().UnixMicro()
 	if now < accessToken.TimeStampMicros {
-		return fmt.Errorf("prover time stamp is in future")
+		return IncorrectMerkleError.New("prover time stamp is in future")
 	}
 
 	// 5 seconds
 	if now-accessToken.TimeStampMicros > cfg.accessTokenLifeTime.Microseconds() {
-		return fmt.Errorf("prover time stamp is dated")
+		return IncorrectMerkleError.New("prover time stamp is dated")
 	}
 
 	if err := pow.Verify(); err != nil {
-		return fmt.Errorf("failed to verify pow: %w", err)
+		return IncorrectMerkleError.Wrap(err, "failed to verify pow")
 	}
 
 	return nil
@@ -89,7 +88,7 @@ func GetMerkleMiddleware(opts ...Option) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if err := validateMerkleHeader(ctx.Request.Header[MerkleHeaderName], accessTokenCache, cfg); err != nil {
 			// TODO: remove err details from a response for a better security
-			rest.EndpointSecurityResponse(ctx, fmt.Errorf("merkle tree verification failed, error: %w", err))
+			rest.EndpointSecurityResponse(ctx, IncorrectMerkleError.Wrap(err, "merkle tree verification failed"))
 			return
 		}
 
@@ -98,7 +97,7 @@ func GetMerkleMiddleware(opts ...Option) gin.HandlerFunc {
 }
 
 // GenerateMerkleHeader generates compact, serialized PoW based on Merkle trees.
-// Header from this function is supposed to be served by a middleware from GetMerkleMiddlware
+// Header from this function is supposed to be served by a middleware from GetMerkleMiddleware
 func GenerateMerkleHeader(depth int, proofLeavesNum int, hashFunc string) (string, error) {
 	accessToken := newAccessToken()
 	tree, err := impl.NewTree(
@@ -108,13 +107,13 @@ func GenerateMerkleHeader(depth int, proofLeavesNum int, hashFunc string) (strin
 		accessToken.String(),
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to create new merkle tree: %w", err)
+		return "", InternalError.Wrap(err, "failed to create new merkle tree")
 	}
 
 	pow := tree.GenerateProofOfWork()
 	jsonData, err := json.Marshal(pow)
 	if err != nil {
-		return "", fmt.Errorf("failed to json marshal merkle header, error: %w", err)
+		return "", InternalError.Wrap(err, "failed to json marshal merkle header")
 	}
 
 	return string(jsonData), nil
